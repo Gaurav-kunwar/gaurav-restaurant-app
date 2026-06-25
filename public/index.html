@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gaurav Restaurant</title>
+    <meta name="description" content="Gaurav Restaurant serves fresh Indian meals, table reservations, pickup orders, and family dining.">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="#home"><span>GR</span>Gaurav Restaurant</a>
+      <nav>
+        <a href="#menu">Menu</a>
+        <a href="#booking">Booking</a>
+        <a href="#order">Order</a>
+        <a href="/admin">Admin</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero" id="home">
+        <img src="assets/hero-table.png" alt="Restaurant table with fresh dishes" class="hero-image">
+        <div class="hero-shade"></div>
+        <div class="hero-content">
+          <p class="eyebrow">Family dining | fresh Indian food</p>
+          <h1>Gaurav Restaurant</h1>
+          <p>Table booking, pickup ordering, and a live menu system built for daily restaurant use.</p>
+          <div class="actions">
+            <a class="btn primary" href="#booking">Book Table</a>
+            <a class="btn ghost" href="#menu">See Menu</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="info-strip" aria-label="Restaurant highlights">
+        <div><strong>11 AM-11 PM</strong><span>Open daily</span></div>
+        <div><strong>Pickup Ready</strong><span>Online orders saved</span></div>
+        <div><strong>Admin Panel</strong><span>Edit menu anytime</span></div>
+      </section>
+
+      <section class="section" id="menu">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Live Menu</p>
+            <h2>Popular dishes</h2>
+          </div>
+          <select id="categoryFilter" aria-label="Filter by category">
+            <option value="all">All categories</option>
+          </select>
+        </div>
+        <div class="menu-grid" id="menuGrid"></div>
+      </section>
+
+      <section class="section two-col">
+        <form class="panel form-panel" id="booking">
+          <p class="eyebrow">Reservation</p>
+          <h2>Book a table</h2>
+          <label>Name<input name="customer_name" required></label>
+          <label>Phone<input name="phone" required></label>
+          <div class="field-row">
+            <label>Guests<input name="guests" type="number" min="1" max="20" value="2" required></label>
+            <label>Date<input name="reservation_date" type="date" required></label>
+          </div>
+          <label>Time<select name="reservation_time" required>
+            <option value="">Select time</option>
+            <option>12:00 PM</option><option>1:00 PM</option><option>2:00 PM</option>
+            <option>7:00 PM</option><option>8:00 PM</option><option>9:00 PM</option>
+          </select></label>
+          <label>Note<textarea name="note" rows="3" placeholder="Birthday, window seat, etc."></textarea></label>
+          <button class="btn primary" type="submit">Send Booking</button>
+          <p class="status" id="bookingStatus"></p>
+        </form>
+
+        <form class="panel form-panel" id="order">
+          <p class="eyebrow">Pickup Order</p>
+          <h2>Build an order</h2>
+          <div class="cart" id="cartList">Select items from the menu.</div>
+          <label>Name<input name="customer_name" required></label>
+          <label>Phone<input name="phone" required></label>
+          <label>Type<select name="order_type"><option value="pickup">Pickup</option><option value="delivery">Delivery</option></select></label>
+          <button class="btn primary" type="submit">Place Order</button>
+          <p class="status" id="orderStatus"></p>
+        </form>
+      </section>
+
+      <section class="section visit">
+        <div>
+          <p class="eyebrow">Visit</p>
+          <h2>Address pending</h2>
+          <p>Share the real restaurant address and Google Maps link, and I will update this section and deploy-ready metadata.</p>
+        </div>
+        <div class="panel compact">
+          <strong>Next info needed from you</strong>
+          <p>Address, phone number, WhatsApp number, real menu, logo, and preferred delivery area.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <strong>Gaurav Restaurant</strong>
+      <span>Website + backend + SQLite database starter</span>
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

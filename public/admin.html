@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Gaurav Restaurant Admin</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="admin-body">
+    <header class="topbar solid">
+      <a class="brand" href="/admin"><span>GR</span>Gaurav Restaurant</a>
+      <nav>
+        <a href="/">Website</a>
+        <a href="#menuAdmin">Menu</a>
+        <a href="#bookingsAdmin">Bookings</a>
+        <a href="#ordersAdmin">Orders</a>
+        <button class="nav-button" id="logoutButton" type="button">Logout</button>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <section class="admin-hero">
+        <p class="eyebrow">Private owner dashboard</p>
+        <h1>Restaurant Control Room</h1>
+        <p>Manage menu items, see reservation requests, and review saved pickup or delivery orders.</p>
+      </section>
+
+      <section class="section two-col admin-grid" id="menuAdmin">
+        <form class="panel form-panel" id="menuForm">
+          <p class="eyebrow">Menu Editor</p>
+          <h2>Add item</h2>
+          <input type="hidden" name="id">
+          <label>Name<input name="name" required></label>
+          <label>Category<input name="category" placeholder="Main Course" required></label>
+          <label>Description<textarea name="description" rows="3" required></textarea></label>
+          <div class="field-row">
+            <label>Price INR<input name="price" type="number" min="1" required></label>
+            <label>Food Type<select name="is_veg"><option value="1">Veg</option><option value="0">Non-veg</option></select></label>
+          </div>
+          <label class="check"><input name="is_available" type="checkbox" checked> Available today</label>
+          <button class="btn primary" type="submit">Save Item</button>
+          <p class="status" id="menuStatus"></p>
+        </form>
+
+        <div class="panel">
+          <div class="section-head tight">
+            <div>
+              <p class="eyebrow">Current Menu</p>
+              <h2>Items</h2>
+            </div>
+          </div>
+          <div class="admin-list" id="adminMenuList"></div>
+        </div>
+      </section>
+
+      <section class="section two-col admin-grid">
+        <div class="panel" id="bookingsAdmin">
+          <p class="eyebrow">Reservations</p>
+          <h2>Booking requests</h2>
+          <div class="admin-list" id="reservationList"></div>
+        </div>
+        <div class="panel" id="ordersAdmin">
+          <p class="eyebrow">Orders</p>
+          <h2>Pickup and delivery</h2>
+          <div class="admin-list" id="orderList"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="admin.js"></script>
+  </body>
+</html>
