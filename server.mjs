@@ -259,11 +259,23 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const items = Array.isArray(body.items) ? body.items : [];
       if (items.length === 0) throw new Error("Cart is empty");
-      const ids = items.map((item) => Number(item.id)).filter(Number.isInteger);
       const menu = new Map(menuRows().map((item) => [item.id, item]));
-      const safeItems = ids.map((id) => menu.get(id)).filter(Boolean);
+      const quantities = new Map();
+      items.forEach((item) => {
+        const id = Number(item.id);
+        const quantity = Number(item.quantity || 1);
+        if (!Number.isInteger(id) || !Number.isInteger(quantity) || quantity < 1) return;
+        quantities.set(id, (quantities.get(id) || 0) + quantity);
+      });
+      const safeItems = [...quantities.entries()]
+        .map(([id, quantity]) => {
+          const item = menu.get(id);
+          if (!item || !item.is_available) return null;
+          return { id: item.id, name: item.name, price: item.price, quantity, line_total: item.price * quantity };
+        })
+        .filter(Boolean);
       if (safeItems.length === 0) throw new Error("Valid items are required");
-      const total = safeItems.reduce((sum, item) => sum + item.price, 0);
+      const total = safeItems.reduce((sum, item) => sum + item.line_total, 0);
       db.prepare(`
         INSERT INTO orders (customer_name, phone, order_type, items_json, total)
         VALUES (?, ?, ?, ?, ?)
@@ -271,7 +283,7 @@ async function handleApi(req, res, url) {
         validateText(body.customer_name, "Name", 2),
         validateText(body.phone, "Phone", 8),
         body.order_type === "delivery" ? "delivery" : "pickup",
-        JSON.stringify(safeItems.map(({ id, name, price }) => ({ id, name, price }))),
+        JSON.stringify(safeItems),
         total
       );
       return sendJson(res, 201, { ok: true, message: "Order saved", total });
