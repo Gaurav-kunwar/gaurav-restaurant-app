@@ -4,6 +4,7 @@ const state = {
 };
 
 const CART_STORAGE_KEY = "gauravRestaurantCart";
+const CHECKOUT_DETAILS_KEY = "gauravRestaurantCheckoutDetails";
 
 const menuGrid = document.querySelector("#menuGrid");
 const categoryFilter = document.querySelector("#categoryFilter");
@@ -178,18 +179,13 @@ bookingForm.addEventListener("submit", async (event) => {
 orderForm.addEventListener("submit", async (event) => {
   event.preventDefault();
   const status = document.querySelector("#orderStatus");
-  const body = Object.fromEntries(new FormData(orderForm));
-  body.items = state.cart.map(({ id, quantity }) => ({ id, quantity }));
-  try {
-    const result = await api("/api/orders", { method: "POST", body: JSON.stringify(body) });
-    status.textContent = `Order saved. Total ${rupees(result.total)}.`;
-    state.cart = [];
-    saveCart();
-    orderForm.reset();
-    renderCart();
-  } catch (error) {
-    status.textContent = error.message;
+  if (state.cart.length === 0) {
+    status.textContent = "Your cart is empty. Add an item before checkout.";
+    return;
   }
+  const body = Object.fromEntries(new FormData(orderForm));
+  sessionStorage.setItem(CHECKOUT_DETAILS_KEY, JSON.stringify(body));
+  window.location.href = "/checkout.html";
 });
 
 loadCart();

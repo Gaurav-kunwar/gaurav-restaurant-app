@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order Confirmed | Gaurav Restaurant</title>
+    <meta name="description" content="Your Gaurav Restaurant order confirmation.">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="checkout-body">
+    <header class="topbar solid">
+      <a class="brand" href="/"><span>GR</span>Gaurav Restaurant</a>
+      <div class="topbar-actions">
+        <nav>
+          <a href="/">Website</a>
+          <a href="/#menu">Menu</a>
+          <a href="/admin">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="checkout-main">
+      <section class="section confirmation-shell">
+        <div class="panel confirmation-card">
+          <p class="eyebrow">Order placed</p>
+          <h1>Thank you</h1>
+          <p>Your order has been saved successfully.</p>
+          <div class="order-id-box">
+            <span>Order ID</span>
+            <strong id="confirmationOrderId">Pending</strong>
+          </div>
+          <div class="confirmation-details" id="confirmationDetails"></div>
+          <div class="actions">
+            <a class="btn primary" href="/">Back to Website</a>
+            <a class="btn secondary" href="/#menu">Order More</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <strong>Gaurav Restaurant</strong>
+      <span>Website + backend + SQLite database starter</span>
+    </footer>
+
+    <script src="confirmation.js"></script>
+  </body>
+</html>

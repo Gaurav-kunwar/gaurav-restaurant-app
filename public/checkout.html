@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Checkout | Gaurav Restaurant</title>
+    <meta name="description" content="Complete your Gaurav Restaurant delivery checkout.">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="checkout-body">
+    <header class="topbar solid">
+      <a class="brand" href="/"><span>GR</span>Gaurav Restaurant</a>
+      <div class="topbar-actions">
+        <nav>
+          <a href="/">Website</a>
+          <a href="/#menu">Menu</a>
+          <a href="/#order">Cart</a>
+          <a href="/admin">Admin</a>
+        </nav>
+        <a class="cart-link" href="/#order" aria-label="View cart">
+          <span class="cart-glyph" aria-hidden="true"></span>
+          <span id="cartCount">0</span>
+        </a>
+      </div>
+    </header>
+
+    <main class="checkout-main">
+      <section class="admin-hero checkout-hero">
+        <p class="eyebrow">Secure checkout</p>
+        <h1>Checkout</h1>
+        <p>Review your order and enter delivery details before placing it.</p>
+      </section>
+
+      <section class="section checkout-grid">
+        <form class="panel form-panel" id="checkoutForm" novalidate>
+          <p class="eyebrow">Customer Details</p>
+          <h2>Delivery information</h2>
+
+          <label>Customer Full Name
+            <input name="customer_name" autocomplete="name" required>
+            <span class="field-error" data-error-for="customer_name"></span>
+          </label>
+
+          <label>Phone Number
+            <input name="phone" autocomplete="tel" inputmode="tel" required>
+            <span class="field-error" data-error-for="phone"></span>
+          </label>
+
+          <label>Full Delivery Address
+            <textarea name="full_address" rows="3" autocomplete="street-address" required></textarea>
+            <span class="field-error" data-error-for="full_address"></span>
+          </label>
+
+          <label>Landmark
+            <input name="landmark" autocomplete="address-line2">
+            <span class="field-error" data-error-for="landmark"></span>
+          </label>
+
+          <div class="field-row">
+            <label>City
+              <input name="city" autocomplete="address-level2" required>
+              <span class="field-error" data-error-for="city"></span>
+            </label>
+            <label>State
+              <input name="state" autocomplete="address-level1" required>
+              <span class="field-error" data-error-for="state"></span>
+            </label>
+          </div>
+
+          <label>PIN Code
+            <input name="pin_code" autocomplete="postal-code" inputmode="numeric" maxlength="6" required>
+            <span class="field-error" data-error-for="pin_code"></span>
+          </label>
+
+          <label>Delivery Instructions
+            <textarea name="delivery_instructions" rows="3" placeholder="Gate code, preferred drop-off, allergy note, etc."></textarea>
+            <span class="field-error" data-error-for="delivery_instructions"></span>
+          </label>
+
+          <input type="hidden" name="order_type" value="delivery">
+          <button class="btn primary" type="submit">Place Order</button>
+          <p class="status" id="checkoutStatus"></p>
+        </form>
+
+        <aside class="panel checkout-summary" aria-label="Complete order summary">
+          <p class="eyebrow">Order Summary</p>
+          <h2>Your order</h2>
+          <div class="cart checkout-cart" id="checkoutCart">Your cart is empty</div>
+        </aside>
+      </section>
+    </main>
+
+    <footer>
+      <strong>Gaurav Restaurant</strong>
+      <span>Website + backend + SQLite database starter</span>
+    </footer>
+
+    <script src="checkout.js"></script>
+  </body>
+</html>

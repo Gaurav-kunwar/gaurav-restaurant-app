@@ -53,6 +53,28 @@ db.exec(`
   );
 `);
 
+function ensureColumn(table, column, definition) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((item) => item.name);
+  if (!columns.includes(column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
+}
+
+[
+  ["order_id", "TEXT"],
+  ["full_address", "TEXT"],
+  ["landmark", "TEXT"],
+  ["city", "TEXT"],
+  ["state", "TEXT"],
+  ["pin_code", "TEXT"],
+  ["delivery_instructions", "TEXT"],
+  ["subtotal", "INTEGER"],
+  ["delivery_charge", "INTEGER"],
+  ["tax", "INTEGER"],
+  ["final_total", "INTEGER"],
+  ["placed_at", "TEXT"]
+].forEach(([column, definition]) => ensureColumn("orders", column, definition));
+
 const count = db.prepare("SELECT COUNT(*) AS count FROM menu_items").get().count;
 if (count === 0) {
   const seed = db.prepare(`
@@ -81,6 +103,9 @@ const mimeTypes = {
   ".jpeg": "image/jpeg",
   ".svg": "image/svg+xml"
 };
+
+const deliveryCharge = 49;
+const taxRate = 0.05;
 
 function sendJson(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -154,6 +179,24 @@ function validateText(value, label, min = 1) {
   const text = String(value || "").trim();
   if (text.length < min) throw new Error(`${label} is required`);
   return text;
+}
+
+function validatePhone(value) {
+  const phone = validateText(value, "Phone Number", 8);
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 15) throw new Error("Enter a valid phone number");
+  return phone;
+}
+
+function validatePinCode(value) {
+  const pinCode = validateText(value, "PIN Code", 6);
+  if (!/^\d{6}$/.test(pinCode)) throw new Error("Enter a valid 6-digit PIN Code");
+  return pinCode;
+}
+
+function generateOrderId() {
+  const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return `GR-${stamp}-${randomBytes(3).toString("hex").toUpperCase()}`;
 }
 
 async function handleApi(req, res, url) {
@@ -259,6 +302,16 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const items = Array.isArray(body.items) ? body.items : [];
       if (items.length === 0) throw new Error("Cart is empty");
+      const customerName = validateText(body.customer_name || body.full_name, "Customer Full Name", 2);
+      const phone = validatePhone(body.phone);
+      const fullAddress = validateText(body.full_address, "Full Delivery Address", 8);
+      const city = validateText(body.city, "City", 2);
+      const stateName = validateText(body.state, "State", 2);
+      const pinCode = validatePinCode(body.pin_code);
+      const landmark = String(body.landmark || "").trim();
+      const deliveryInstructions = String(body.delivery_instructions || "").trim();
+      const orderId = generateOrderId();
+      const placedAt = new Date().toISOString();
       const menu = new Map(menuRows().map((item) => [item.id, item]));
       const quantities = new Map();
       items.forEach((item) => {
@@ -275,18 +328,44 @@ async function handleApi(req, res, url) {
         })
         .filter(Boolean);
       if (safeItems.length === 0) throw new Error("Valid items are required");
-      const total = safeItems.reduce((sum, item) => sum + item.line_total, 0);
+      const subtotal = safeItems.reduce((sum, item) => sum + item.line_total, 0);
+      const tax = Math.round(subtotal * taxRate);
+      const finalTotal = subtotal + deliveryCharge + tax;
       db.prepare(`
-        INSERT INTO orders (customer_name, phone, order_type, items_json, total)
-        VALUES (?, ?, ?, ?, ?)
+        INSERT INTO orders (
+          order_id, customer_name, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
+          final_total, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
-        validateText(body.customer_name, "Name", 2),
-        validateText(body.phone, "Phone", 8),
+        orderId,
+        customerName,
+        phone,
         body.order_type === "delivery" ? "delivery" : "pickup",
         JSON.stringify(safeItems),
-        total
+        subtotal,
+        deliveryCharge,
+        tax,
+        finalTotal,
+        finalTotal,
+        fullAddress,
+        landmark,
+        city,
+        stateName,
+        pinCode,
+        deliveryInstructions,
+        placedAt
       );
-      return sendJson(res, 201, { ok: true, message: "Order saved", total });
+      return sendJson(res, 201, {
+        ok: true,
+        message: "Order saved",
+        orderId,
+        placedAt,
+        subtotal,
+        deliveryCharge,
+        tax,
+        total: finalTotal
+      });
     }
 
     return sendJson(res, 404, { error: "API route not found" });
