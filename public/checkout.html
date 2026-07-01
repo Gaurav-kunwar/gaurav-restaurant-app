@@ -36,7 +36,7 @@
           <p class="eyebrow">Customer Details</p>
           <h2>Delivery information</h2>
 
-          <label>Customer Full Name
+          <label>Customer Name
             <input name="customer_name" autocomplete="name" required>
             <span class="field-error" data-error-for="customer_name"></span>
           </label>
@@ -46,13 +46,18 @@
             <span class="field-error" data-error-for="phone"></span>
           </label>
 
-          <label>Full Delivery Address
-            <textarea name="full_address" rows="3" autocomplete="street-address" required></textarea>
-            <span class="field-error" data-error-for="full_address"></span>
+          <label>House/Flat No.
+            <input name="house_flat" autocomplete="address-line1" required>
+            <span class="field-error" data-error-for="house_flat"></span>
+          </label>
+
+          <label>Street/Area
+            <input name="street_area" autocomplete="address-line2" required>
+            <span class="field-error" data-error-for="street_area"></span>
           </label>
 
           <label>Landmark
-            <input name="landmark" autocomplete="address-line2">
+            <input name="landmark">
             <span class="field-error" data-error-for="landmark"></span>
           </label>
 
@@ -61,16 +66,11 @@
               <input name="city" autocomplete="address-level2" required>
               <span class="field-error" data-error-for="city"></span>
             </label>
-            <label>State
-              <input name="state" autocomplete="address-level1" required>
-              <span class="field-error" data-error-for="state"></span>
+            <label>Pincode
+              <input name="pin_code" autocomplete="postal-code" inputmode="numeric" maxlength="6" required>
+              <span class="field-error" data-error-for="pin_code"></span>
             </label>
           </div>
-
-          <label>PIN Code
-            <input name="pin_code" autocomplete="postal-code" inputmode="numeric" maxlength="6" required>
-            <span class="field-error" data-error-for="pin_code"></span>
-          </label>
 
           <label>Delivery Instructions
             <textarea name="delivery_instructions" rows="3" placeholder="Gate code, preferred drop-off, allergy note, etc."></textarea>

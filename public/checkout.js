@@ -105,12 +105,12 @@ function validateCheckout() {
   const data = Object.fromEntries(new FormData(checkoutForm));
   const errors = {};
   const required = {
-    customer_name: "Customer Full Name is required",
+    customer_name: "Customer Name is required",
     phone: "Phone Number is required",
-    full_address: "Full Delivery Address is required",
+    house_flat: "House/Flat No. is required",
+    street_area: "Street/Area is required",
     city: "City is required",
-    state: "State is required",
-    pin_code: "PIN Code is required"
+    pin_code: "Pincode is required"
   };
 
   Object.entries(required).forEach(([name, message]) => {
@@ -123,10 +123,10 @@ function validateCheckout() {
   }
 
   if (data.pin_code && !/^\d{6}$/.test(String(data.pin_code).trim())) {
-    errors.pin_code = "Enter a valid 6-digit PIN Code";
+    errors.pin_code = "Enter a valid 6-digit pincode";
   }
 
-  ["customer_name", "phone", "full_address", "landmark", "city", "state", "pin_code", "delivery_instructions"].forEach((name) => {
+  ["customer_name", "phone", "house_flat", "street_area", "landmark", "city", "pin_code", "delivery_instructions"].forEach((name) => {
     setFieldError(name, errors[name] || "");
   });
 

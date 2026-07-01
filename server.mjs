@@ -62,6 +62,8 @@ function ensureColumn(table, column, definition) {
 
 [
   ["order_id", "TEXT"],
+  ["house_flat", "TEXT"],
+  ["street_area", "TEXT"],
   ["full_address", "TEXT"],
   ["landmark", "TEXT"],
   ["city", "TEXT"],
@@ -189,8 +191,8 @@ function validatePhone(value) {
 }
 
 function validatePinCode(value) {
-  const pinCode = validateText(value, "PIN Code", 6);
-  if (!/^\d{6}$/.test(pinCode)) throw new Error("Enter a valid 6-digit PIN Code");
+  const pinCode = validateText(value, "Pincode", 6);
+  if (!/^\d{6}$/.test(pinCode)) throw new Error("Enter a valid 6-digit pincode");
   return pinCode;
 }
 
@@ -302,14 +304,15 @@ async function handleApi(req, res, url) {
       const body = await readJson(req);
       const items = Array.isArray(body.items) ? body.items : [];
       if (items.length === 0) throw new Error("Cart is empty");
-      const customerName = validateText(body.customer_name || body.full_name, "Customer Full Name", 2);
+      const customerName = validateText(body.customer_name || body.full_name, "Customer Name", 2);
       const phone = validatePhone(body.phone);
-      const fullAddress = validateText(body.full_address, "Full Delivery Address", 8);
+      const houseFlat = validateText(body.house_flat, "House/Flat No.", 1);
+      const streetArea = validateText(body.street_area, "Street/Area", 3);
       const city = validateText(body.city, "City", 2);
-      const stateName = validateText(body.state, "State", 2);
       const pinCode = validatePinCode(body.pin_code);
       const landmark = String(body.landmark || "").trim();
       const deliveryInstructions = String(body.delivery_instructions || "").trim();
+      const fullAddress = [houseFlat, streetArea, landmark, city, pinCode].filter(Boolean).join(", ");
       const orderId = generateOrderId();
       const placedAt = new Date().toISOString();
       const menu = new Map(menuRows().map((item) => [item.id, item]));
@@ -334,9 +337,9 @@ async function handleApi(req, res, url) {
       db.prepare(`
         INSERT INTO orders (
           order_id, customer_name, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
-          final_total, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at
+          final_total, house_flat, street_area, full_address, landmark, city, pin_code, delivery_instructions, placed_at
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         customerName,
@@ -348,10 +351,11 @@ async function handleApi(req, res, url) {
         tax,
         finalTotal,
         finalTotal,
+        houseFlat,
+        streetArea,
         fullAddress,
         landmark,
         city,
-        stateName,
         pinCode,
         deliveryInstructions,
         placedAt

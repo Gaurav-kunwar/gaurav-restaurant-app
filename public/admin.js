@@ -22,6 +22,12 @@ function empty(text) {
   return `<div class="admin-item"><small>${text}</small></div>`;
 }
 
+function deliveryAddress(order) {
+  return order.full_address || [order.house_flat, order.street_area, order.landmark, order.city, order.pin_code]
+    .filter(Boolean)
+    .join(", ") || "Delivery address not captured";
+}
+
 async function loadAdmin() {
   const session = await api("/api/auth/me");
   if (!session.admin) {
@@ -55,6 +61,8 @@ async function loadAdmin() {
     <div class="admin-item">
       <strong><span>${order.customer_name}</span><span>${rupees(order.total)}</span></strong>
       <small>${order.phone} | ${order.order_type} | ${order.status}</small>
+      <small>Address: ${deliveryAddress(order)}</small>
+      <small>${order.delivery_instructions ? `Instructions: ${order.delivery_instructions}` : "No delivery instructions"}</small>
       <small>${order.items.map((item) => item.name).join(", ")}</small>
     </div>
   `).join("") : empty("No orders yet.");
