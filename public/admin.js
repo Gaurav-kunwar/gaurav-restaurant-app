@@ -3,6 +3,7 @@ const adminMenuList = document.querySelector("#adminMenuList");
 const reservationList = document.querySelector("#reservationList");
 const orderList = document.querySelector("#orderList");
 const logoutButton = document.querySelector("#logoutButton");
+const orderStatuses = ["Pending", "Accepted", "Preparing", "Ready", "Out for Delivery", "Delivered", "Cancelled"];
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -26,6 +27,12 @@ function deliveryAddress(order) {
   return order.full_address || [order.house_flat, order.street_area, order.landmark, order.city, order.pin_code]
     .filter(Boolean)
     .join(", ") || "Delivery address not captured";
+}
+
+function statusOptions(currentStatus) {
+  return orderStatuses.map((status) => `
+    <option value="${status}" ${status === currentStatus ? "selected" : ""}>${status}</option>
+  `).join("");
 }
 
 async function loadAdmin() {
@@ -61,6 +68,11 @@ async function loadAdmin() {
     <div class="admin-item">
       <strong><span>${order.customer_name}</span><span>${rupees(order.total)}</span></strong>
       <small>${order.phone} | ${order.order_type} | ${order.status}</small>
+      <label class="admin-status">Status
+        <select data-order-status="${order.id}">
+          ${statusOptions(order.status)}
+        </select>
+      </label>
       <small>Address: ${deliveryAddress(order)}</small>
       <small>${order.delivery_instructions ? `Instructions: ${order.delivery_instructions}` : "No delivery instructions"}</small>
       <small>${order.items.map((item) => item.name).join(", ")}</small>
@@ -83,6 +95,19 @@ menuForm.addEventListener("submit", async (event) => {
     await loadAdmin();
   } catch (error) {
     status.textContent = error.message;
+  }
+});
+
+orderList.addEventListener("change", async (event) => {
+  const select = event.target.closest("[data-order-status]");
+  if (!select) return;
+  const status = select.value;
+  try {
+    await api(`/api/orders/${select.dataset.orderStatus}`, { method: "PATCH", body: JSON.stringify({ status }) });
+    await loadAdmin();
+  } catch (error) {
+    alert(error.message);
+    await loadAdmin();
   }
 });
 

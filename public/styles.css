@@ -288,6 +288,13 @@ footer span { color: rgba(255,255,255,.66); }
 }
 .admin-item strong { display: flex; justify-content: space-between; gap: 12px; }
 .admin-item small { color: var(--muted); line-height: 1.5; }
+.admin-status {
+  grid-template-columns: auto minmax(150px, 1fr);
+  align-items: center;
+  color: var(--muted);
+  font-size: .84rem;
+}
+.admin-status select { min-height: 38px; }
 
 .login-body {
   min-height: 100vh;

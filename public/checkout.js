@@ -180,6 +180,7 @@ checkoutForm.addEventListener("submit", async (event) => {
       subtotal: result.subtotal,
       deliveryCharge: result.deliveryCharge,
       tax: result.tax,
+      status: result.status,
       total: result.total
     }));
     state.cart = [];

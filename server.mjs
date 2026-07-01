@@ -48,7 +48,7 @@ db.exec(`
     order_type TEXT NOT NULL,
     items_json TEXT NOT NULL,
     total INTEGER NOT NULL,
-    status TEXT NOT NULL DEFAULT 'new',
+    status TEXT NOT NULL DEFAULT 'Pending',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
   );
 `);
@@ -108,6 +108,9 @@ const mimeTypes = {
 
 const deliveryCharge = 49;
 const taxRate = 0.05;
+const orderStatuses = ["Pending", "Accepted", "Preparing", "Ready", "Out for Delivery", "Delivered", "Cancelled"];
+
+db.prepare("UPDATE orders SET status = ? WHERE LOWER(status) IN (?, ?)").run("Pending", "new", "pending");
 
 function sendJson(res, status, body) {
   res.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -199,6 +202,12 @@ function validatePinCode(value) {
 function generateOrderId() {
   const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
   return `GR-${stamp}-${randomBytes(3).toString("hex").toUpperCase()}`;
+}
+
+function validateOrderStatus(value) {
+  const status = String(value || "").trim();
+  if (!orderStatuses.includes(status)) throw new Error("Invalid order status");
+  return status;
 }
 
 async function handleApi(req, res, url) {
@@ -300,6 +309,24 @@ async function handleApi(req, res, url) {
       return sendJson(res, 200, { orders: rows });
     }
 
+    if (req.method === "GET" && url.pathname === "/api/order-status") {
+      const orderId = validateText(url.searchParams.get("orderId"), "Order ID", 6);
+      const order = db.prepare("SELECT order_id, status, placed_at FROM orders WHERE order_id = ?").get(orderId);
+      if (!order) throw new Error("Order not found");
+      return sendJson(res, 200, { order });
+    }
+
+    if (req.method === "PATCH" && url.pathname.startsWith("/api/orders/")) {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(url.pathname.split("/").pop());
+      if (!Number.isInteger(id)) throw new Error("Invalid order");
+      const body = await readJson(req);
+      const status = validateOrderStatus(body.status);
+      const result = db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, id);
+      if (result.changes === 0) throw new Error("Order not found");
+      return sendJson(res, 200, { ok: true, status });
+    }
+
     if (req.method === "POST" && url.pathname === "/api/orders") {
       const body = await readJson(req);
       const items = Array.isArray(body.items) ? body.items : [];
@@ -337,9 +364,9 @@ async function handleApi(req, res, url) {
       db.prepare(`
         INSERT INTO orders (
           order_id, customer_name, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
-          final_total, house_flat, street_area, full_address, landmark, city, pin_code, delivery_instructions, placed_at
+          final_total, house_flat, street_area, full_address, landmark, city, pin_code, delivery_instructions, placed_at, status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         customerName,
@@ -358,7 +385,8 @@ async function handleApi(req, res, url) {
         city,
         pinCode,
         deliveryInstructions,
-        placedAt
+        placedAt,
+        "Pending"
       );
       return sendJson(res, 201, {
         ok: true,
@@ -368,6 +396,7 @@ async function handleApi(req, res, url) {
         subtotal,
         deliveryCharge,
         tax,
+        status: "Pending",
         total: finalTotal
       });
     }
