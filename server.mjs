@@ -219,6 +219,110 @@ function orderRows(where = "deleted_at IS NULL") {
   }));
 }
 
+function orderDate(order) {
+  return new Date(order.placed_at || order.created_at);
+}
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+function startOfWeek() {
+  const today = startOfToday();
+  const day = today.getDay() || 7;
+  today.setDate(today.getDate() - day + 1);
+  return today;
+}
+
+function dashboardRange(filter) {
+  const now = new Date();
+  if (filter === "today") {
+    const start = startOfToday();
+    return { key: "today", start, end: now };
+  }
+  if (filter === "week") {
+    return { key: "week", start: startOfWeek(), end: now };
+  }
+  if (filter === "month") {
+    return { key: "month", start: new Date(now.getFullYear(), now.getMonth(), 1), end: now };
+  }
+  return { key: "all", start: null, end: now };
+}
+
+function dateKey(value) {
+  const date = new Date(value);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function dateLabel(key) {
+  return new Intl.DateTimeFormat("en-IN", { day: "2-digit", month: "short" }).format(new Date(`${key}T00:00:00`));
+}
+
+function orderAmount(order) {
+  return Number(order.final_total || order.total || 0);
+}
+
+function isRevenueOrder(order) {
+  return order.status === "Delivered";
+}
+
+function buildDashboard(filter) {
+  const range = dashboardRange(filter);
+  const allOrders = orderRows("deleted_at IS NULL");
+  const inRange = allOrders.filter((order) => {
+    if (!range.start) return true;
+    const date = orderDate(order);
+    return date >= range.start && date <= range.end;
+  });
+  const todayStart = startOfToday();
+  const todayOrders = allOrders.filter((order) => orderDate(order) >= todayStart);
+  const revenueOrders = inRange.filter(isRevenueOrder);
+  const todayRevenueOrders = todayOrders.filter(isRevenueOrder);
+  const chartMap = new Map();
+  const topItems = new Map();
+
+  inRange.forEach((order) => {
+    const key = dateKey(orderDate(order));
+    const day = chartMap.get(key) || { date: key, label: dateLabel(key), orders: 0, revenue: 0 };
+    day.orders += 1;
+    if (isRevenueOrder(order)) day.revenue += orderAmount(order);
+    chartMap.set(key, day);
+
+    if (order.status !== "Cancelled") {
+      order.items.forEach((item) => {
+        const id = item.id || item.name;
+        const current = topItems.get(id) || { id, name: item.name, quantity: 0, revenue: 0 };
+        const quantity = Number(item.quantity || 1);
+        current.quantity += quantity;
+        current.revenue += Number(item.line_total || item.price * quantity || 0);
+        topItems.set(id, current);
+      });
+    }
+  });
+
+  return {
+    filter: range.key,
+    summary: {
+      totalOrders: inRange.length,
+      todaysOrders: todayOrders.length,
+      pendingOrders: inRange.filter((order) => order.status === "Pending").length,
+      deliveredOrders: inRange.filter((order) => order.status === "Delivered").length,
+      cancelledOrders: inRange.filter((order) => order.status === "Cancelled").length,
+      totalRevenue: revenueOrders.reduce((sum, order) => sum + orderAmount(order), 0),
+      todayRevenue: todayRevenueOrders.reduce((sum, order) => sum + orderAmount(order), 0)
+    },
+    recentOrders: inRange.slice(0, 5),
+    topItems: [...topItems.values()]
+      .sort((left, right) => right.quantity - left.quantity || right.revenue - left.revenue)
+      .slice(0, 5),
+    charts: [...chartMap.values()].sort((left, right) => left.date.localeCompare(right.date))
+  };
+}
+
 async function handleApi(req, res, url) {
   try {
     if (req.method === "GET" && url.pathname === "/api/auth/me") {
@@ -289,6 +393,11 @@ async function handleApi(req, res, url) {
       if (!requireAdmin(req, res)) return;
       const rows = db.prepare("SELECT * FROM reservations ORDER BY created_at DESC").all();
       return sendJson(res, 200, { reservations: rows });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/admin/dashboard") {
+      if (!requireAdmin(req, res)) return;
+      return sendJson(res, 200, buildDashboard(url.searchParams.get("filter")));
     }
 
     if (req.method === "POST" && url.pathname === "/api/reservations") {

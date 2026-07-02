@@ -3,7 +3,14 @@ const adminMenuList = document.querySelector("#adminMenuList");
 const reservationList = document.querySelector("#reservationList");
 const orderList = document.querySelector("#orderList");
 const logoutButton = document.querySelector("#logoutButton");
+const dashboardFilters = document.querySelector("#dashboardFilters");
+const dashboardCards = document.querySelector("#dashboardCards");
+const dashboardRecentOrders = document.querySelector("#dashboardRecentOrders");
+const dashboardTopItems = document.querySelector("#dashboardTopItems");
+const ordersChart = document.querySelector("#ordersChart");
+const revenueChart = document.querySelector("#revenueChart");
 const orderStatuses = ["Pending", "Accepted", "Preparing", "Ready", "Out for Delivery", "Delivered", "Cancelled"];
+let dashboardFilter = "today";
 
 async function api(path, options = {}) {
   const response = await fetch(path, {
@@ -41,6 +48,10 @@ function empty(text) {
   return `<div class="admin-item"><small>${text}</small></div>`;
 }
 
+function numberLabel(value) {
+  return Number(value || 0).toLocaleString("en-IN");
+}
+
 function deliveryAddress(order) {
   return order.full_address || [order.house_flat, order.street_area, order.landmark, order.city, order.state, order.pin_code]
     .filter(Boolean)
@@ -61,6 +72,77 @@ function statusOptions(currentStatus) {
   `).join("");
 }
 
+function renderDashboardCards(summary) {
+  const cards = [
+    ["Total Orders", numberLabel(summary.totalOrders)],
+    ["Today's Orders", numberLabel(summary.todaysOrders)],
+    ["Pending Orders", numberLabel(summary.pendingOrders)],
+    ["Delivered Orders", numberLabel(summary.deliveredOrders)],
+    ["Cancelled Orders", numberLabel(summary.cancelledOrders)],
+    ["Total Revenue", rupees(summary.totalRevenue)],
+    ["Today's Revenue", rupees(summary.todayRevenue)]
+  ];
+  dashboardCards.innerHTML = cards.map(([label, value]) => `
+    <div class="dashboard-card">
+      <small>${label}</small>
+      <strong>${value}</strong>
+    </div>
+  `).join("");
+}
+
+function renderDashboardOrders(orders) {
+  dashboardRecentOrders.innerHTML = orders.length ? orders.map((order) => `
+    <div class="admin-item compact-admin-item">
+      <strong><span>${escapeHtml(order.order_id || order.id)}</span><span>${rupees(order.final_total || order.total)}</span></strong>
+      <small>${escapeHtml(order.customer_name)} | ${escapeHtml(order.status)} | ${formatDateTime(order.placed_at || order.created_at)}</small>
+    </div>
+  `).join("") : empty("No recent orders for this filter.");
+}
+
+function renderTopItems(items) {
+  dashboardTopItems.innerHTML = items.length ? items.map((item, index) => `
+    <div class="admin-item compact-admin-item">
+      <strong><span>${index + 1}. ${escapeHtml(item.name)}</span><span>${numberLabel(item.quantity)} sold</span></strong>
+      <small>Revenue: ${rupees(item.revenue)}</small>
+    </div>
+  `).join("") : empty("No best-selling items for this filter.");
+}
+
+function renderChart(element, points, key, formatter = numberLabel) {
+  if (!points.length) {
+    element.innerHTML = empty("No chart data for this filter.");
+    return;
+  }
+  const max = Math.max(...points.map((point) => Number(point[key] || 0)), 1);
+  element.innerHTML = points.map((point) => {
+    const value = Number(point[key] || 0);
+    const height = Math.max(8, Math.round((value / max) * 120));
+    return `
+      <div class="chart-bar">
+        <div class="chart-track"><span style="height: ${height}px"></span></div>
+        <small>${escapeHtml(point.label)}</small>
+        <strong>${formatter(value)}</strong>
+      </div>
+    `;
+  }).join("");
+}
+
+function setDashboardFilter(filter) {
+  dashboardFilter = filter;
+  dashboardFilters.querySelectorAll("[data-dashboard-filter]").forEach((button) => {
+    button.classList.toggle("active", button.dataset.dashboardFilter === filter);
+  });
+}
+
+function renderDashboard(dashboard) {
+  setDashboardFilter(dashboard.filter);
+  renderDashboardCards(dashboard.summary);
+  renderDashboardOrders(dashboard.recentOrders);
+  renderTopItems(dashboard.topItems);
+  renderChart(ordersChart, dashboard.charts, "orders");
+  renderChart(revenueChart, dashboard.charts, "revenue", rupees);
+}
+
 async function loadAdmin() {
   const session = await api("/api/auth/me");
   if (!session.admin) {
@@ -68,11 +150,14 @@ async function loadAdmin() {
     return;
   }
 
-  const [menu, reservations, orders] = await Promise.all([
+  const [dashboard, menu, reservations, orders] = await Promise.all([
+    api(`/api/admin/dashboard?filter=${encodeURIComponent(dashboardFilter)}`),
     api("/api/menu"),
     api("/api/reservations"),
     api("/api/orders")
   ]);
+
+  renderDashboard(dashboard);
 
   adminMenuList.innerHTML = menu.items.length ? menu.items.map((item) => `
     <div class="admin-item">
@@ -151,6 +236,18 @@ orderList.addEventListener("click", async (event) => {
     await loadAdmin();
   } catch (error) {
     alert(error.message);
+  }
+});
+
+dashboardFilters.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-dashboard-filter]");
+  if (!button) return;
+  setDashboardFilter(button.dataset.dashboardFilter);
+  try {
+    const dashboard = await api(`/api/admin/dashboard?filter=${encodeURIComponent(dashboardFilter)}`);
+    renderDashboard(dashboard);
+  } catch (error) {
+    dashboardCards.innerHTML = empty(error.message);
   }
 });
 

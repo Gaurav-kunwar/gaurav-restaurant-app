@@ -26,6 +26,49 @@
         <p>Manage menu items, see reservation requests, and review saved pickup or delivery orders.</p>
       </section>
 
+      <section class="section admin-dashboard" id="dashboardAdmin">
+        <div class="section-head tight">
+          <div>
+            <p class="eyebrow">Dashboard</p>
+            <h2>Business overview</h2>
+          </div>
+          <div class="dashboard-filters" id="dashboardFilters" aria-label="Dashboard filters">
+            <button type="button" data-dashboard-filter="today">Today</button>
+            <button type="button" data-dashboard-filter="week">This Week</button>
+            <button type="button" data-dashboard-filter="month">This Month</button>
+            <button type="button" data-dashboard-filter="all">All Time</button>
+          </div>
+        </div>
+
+        <div class="dashboard-cards" id="dashboardCards"></div>
+
+        <div class="dashboard-grid">
+          <div class="panel">
+            <p class="eyebrow">Recent Orders</p>
+            <h2>Latest 5</h2>
+            <div class="admin-list" id="dashboardRecentOrders"></div>
+          </div>
+          <div class="panel">
+            <p class="eyebrow">Best Sellers</p>
+            <h2>Top 5 items</h2>
+            <div class="admin-list" id="dashboardTopItems"></div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="panel">
+            <p class="eyebrow">Orders per day</p>
+            <h2>Order trend</h2>
+            <div class="chart-bars" id="ordersChart"></div>
+          </div>
+          <div class="panel">
+            <p class="eyebrow">Revenue per day</p>
+            <h2>Revenue trend</h2>
+            <div class="chart-bars" id="revenueChart"></div>
+          </div>
+        </div>
+      </section>
+
       <section class="section two-col admin-grid" id="menuAdmin">
         <form class="panel form-panel" id="menuForm">
           <p class="eyebrow">Menu Editor</p>
