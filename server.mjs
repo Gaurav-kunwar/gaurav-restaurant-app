@@ -74,7 +74,8 @@ function ensureColumn(table, column, definition) {
   ["delivery_charge", "INTEGER"],
   ["tax", "INTEGER"],
   ["final_total", "INTEGER"],
-  ["placed_at", "TEXT"]
+  ["placed_at", "TEXT"],
+  ["deleted_at", "TEXT"]
 ].forEach(([column, definition]) => ensureColumn("orders", column, definition));
 
 const count = db.prepare("SELECT COUNT(*) AS count FROM menu_items").get().count;
@@ -210,6 +211,13 @@ function validateOrderStatus(value) {
   return status;
 }
 
+function orderRows(where = "deleted_at IS NULL") {
+  return db.prepare(`SELECT * FROM orders WHERE ${where} ORDER BY COALESCE(placed_at, created_at) DESC`).all().map((order) => ({
+    ...order,
+    items: JSON.parse(order.items_json)
+  }));
+}
+
 async function handleApi(req, res, url) {
   try {
     if (req.method === "GET" && url.pathname === "/api/auth/me") {
@@ -302,18 +310,37 @@ async function handleApi(req, res, url) {
 
     if (req.method === "GET" && url.pathname === "/api/orders") {
       if (!requireAdmin(req, res)) return;
-      const rows = db.prepare("SELECT * FROM orders ORDER BY created_at DESC").all().map((order) => ({
-        ...order,
-        items: JSON.parse(order.items_json)
-      }));
-      return sendJson(res, 200, { orders: rows });
+      return sendJson(res, 200, { orders: orderRows("deleted_at IS NULL") });
+    }
+
+    if (req.method === "GET" && url.pathname === "/api/orders/trash") {
+      if (!requireAdmin(req, res)) return;
+      return sendJson(res, 200, { orders: orderRows("deleted_at IS NOT NULL") });
     }
 
     if (req.method === "GET" && url.pathname === "/api/order-status") {
       const orderId = validateText(url.searchParams.get("orderId"), "Order ID", 6);
-      const order = db.prepare("SELECT order_id, status, placed_at FROM orders WHERE order_id = ?").get(orderId);
+      const order = db.prepare("SELECT order_id, status, placed_at FROM orders WHERE order_id = ? AND deleted_at IS NULL").get(orderId);
       if (!order) throw new Error("Order not found");
       return sendJson(res, 200, { order });
+    }
+
+    if (req.method === "PATCH" && url.pathname.endsWith("/restore") && url.pathname.startsWith("/api/orders/")) {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(url.pathname.split("/").at(-2));
+      if (!Number.isInteger(id)) throw new Error("Invalid order");
+      const result = db.prepare("UPDATE orders SET deleted_at = NULL WHERE id = ? AND deleted_at IS NOT NULL").run(id);
+      if (result.changes === 0) throw new Error("Order not found in trash");
+      return sendJson(res, 200, { ok: true });
+    }
+
+    if (req.method === "DELETE" && url.pathname.endsWith("/permanent") && url.pathname.startsWith("/api/orders/")) {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(url.pathname.split("/").at(-2));
+      if (!Number.isInteger(id)) throw new Error("Invalid order");
+      const result = db.prepare("DELETE FROM orders WHERE id = ? AND deleted_at IS NOT NULL").run(id);
+      if (result.changes === 0) throw new Error("Order not found in trash");
+      return sendJson(res, 200, { ok: true });
     }
 
     if (req.method === "PATCH" && url.pathname.startsWith("/api/orders/")) {
@@ -322,9 +349,18 @@ async function handleApi(req, res, url) {
       if (!Number.isInteger(id)) throw new Error("Invalid order");
       const body = await readJson(req);
       const status = validateOrderStatus(body.status);
-      const result = db.prepare("UPDATE orders SET status = ? WHERE id = ?").run(status, id);
+      const result = db.prepare("UPDATE orders SET status = ? WHERE id = ? AND deleted_at IS NULL").run(status, id);
       if (result.changes === 0) throw new Error("Order not found");
       return sendJson(res, 200, { ok: true, status });
+    }
+
+    if (req.method === "DELETE" && url.pathname.startsWith("/api/orders/")) {
+      if (!requireAdmin(req, res)) return;
+      const id = Number(url.pathname.split("/").pop());
+      if (!Number.isInteger(id)) throw new Error("Invalid order");
+      const result = db.prepare("UPDATE orders SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL").run(new Date().toISOString(), id);
+      if (result.changes === 0) throw new Error("Order not found");
+      return sendJson(res, 200, { ok: true });
     }
 
     if (req.method === "POST" && url.pathname === "/api/orders") {
@@ -414,7 +450,7 @@ async function serveStatic(req, res, url) {
     return;
   }
 
-  if (url.pathname === "/admin.html" && !currentAdmin(req)) {
+  if ((url.pathname === "/admin.html" || url.pathname === "/trash.html") && !currentAdmin(req)) {
     res.writeHead(302, { location: "/login.html" });
     res.end();
     return;

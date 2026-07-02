@@ -295,6 +295,24 @@ footer span { color: rgba(255,255,255,.66); }
   font-size: .84rem;
 }
 .admin-status select { min-height: 38px; }
+.admin-link {
+  color: var(--leaf);
+  font-size: .9rem;
+  font-weight: 900;
+}
+.admin-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.admin-danger {
+  width: max-content;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  color: #fff;
+  background: var(--chili);
+  cursor: pointer;
+  font-size: .85rem;
+  font-weight: 900;
+}
 
 .login-body {
   min-height: 100vh;

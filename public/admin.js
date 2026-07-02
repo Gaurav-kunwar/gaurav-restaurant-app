@@ -15,6 +15,24 @@ async function api(path, options = {}) {
   return data;
 }
 
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+function formatDateTime(value) {
+  if (!value) return "Not captured";
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
 function rupees(value) {
   return `₹${Number(value).toLocaleString("en-IN")}`;
 }
@@ -66,16 +84,19 @@ async function loadAdmin() {
 
   orderList.innerHTML = orders.orders.length ? orders.orders.map((order) => `
     <div class="admin-item">
-      <strong><span>${order.customer_name}</span><span>${rupees(order.total)}</span></strong>
-      <small>${order.phone} | ${order.order_type} | ${order.status}</small>
+      <strong><span>${escapeHtml(order.customer_name)}</span><span>${rupees(order.final_total || order.total)}</span></strong>
+      <small>Order ID: ${escapeHtml(order.order_id || order.id)}</small>
+      <small>Customer: ${escapeHtml(order.customer_name)} | Phone: ${escapeHtml(order.phone)}</small>
+      <small>Type: ${escapeHtml(order.order_type)} | Status: ${escapeHtml(order.status)} | Date: ${formatDateTime(order.placed_at || order.created_at)}</small>
       <label class="admin-status">Status
         <select data-order-status="${order.id}">
           ${statusOptions(order.status)}
         </select>
       </label>
-      <small>Address: ${deliveryAddress(order)}</small>
-      <small>${order.delivery_instructions ? `Instructions: ${order.delivery_instructions}` : "No delivery instructions"}</small>
-      <small>${order.items.map((item) => item.name).join(", ")}</small>
+      <small>Address: ${escapeHtml(deliveryAddress(order))}</small>
+      <small>${order.delivery_instructions ? `Instructions: ${escapeHtml(order.delivery_instructions)}` : "No delivery instructions"}</small>
+      <small>Items: ${order.items.map((item) => `${escapeHtml(item.name)} x ${Number(item.quantity || 1)}`).join(", ")}</small>
+      <button class="admin-danger" type="button" data-order-delete="${order.id}">Delete Order</button>
     </div>
   `).join("") : empty("No orders yet.");
 }
@@ -108,6 +129,19 @@ orderList.addEventListener("change", async (event) => {
   } catch (error) {
     alert(error.message);
     await loadAdmin();
+  }
+});
+
+orderList.addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-order-delete]");
+  if (!button) return;
+  const confirmed = confirm("Delete this order? It will move to Trash.");
+  if (!confirmed) return;
+  try {
+    await api(`/api/orders/${button.dataset.orderDelete}`, { method: "DELETE" });
+    await loadAdmin();
+  } catch (error) {
+    alert(error.message);
   }
 });
 

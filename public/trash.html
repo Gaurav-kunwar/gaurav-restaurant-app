@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Order Trash | Gaurav Restaurant Admin</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body class="admin-body">
+    <header class="topbar solid">
+      <a class="brand" href="/admin"><span>GR</span>Gaurav Restaurant</a>
+      <nav>
+        <a href="/admin.html">Admin</a>
+        <a href="/admin.html#ordersAdmin">Orders</a>
+        <button class="nav-button" id="logoutButton" type="button">Logout</button>
+      </nav>
+    </header>
+
+    <main class="admin-main">
+      <section class="admin-hero">
+        <p class="eyebrow">Order Trash</p>
+        <h1>Deleted Orders</h1>
+        <p>Restore orders back to history or permanently remove them from the database.</p>
+      </section>
+
+      <section class="section admin-grid">
+        <div class="panel">
+          <div class="section-head tight">
+            <div>
+              <p class="eyebrow">Trash</p>
+              <h2>Orders</h2>
+            </div>
+            <a class="admin-link" href="/admin.html#ordersAdmin">Back to Orders</a>
+          </div>
+          <div class="admin-list" id="trashList"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="trash.js"></script>
+  </body>
+</html>
