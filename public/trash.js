@@ -58,6 +58,7 @@ function renderOrder(order) {
       <small>Order ID: ${escapeHtml(order.order_id || order.id)}</small>
       <small>Customer: ${escapeHtml(order.customer_name)} | Phone: <a class="admin-link" href="${phoneHref(order.phone)}">${escapeHtml(order.phone)}</a></small>
       <small>Status: ${escapeHtml(order.status)} | Date: ${formatDateTime(order.placed_at || order.created_at)}</small>
+      <small>Status updated: ${formatDateTime(order.status_updated_at || order.placed_at || order.created_at)}</small>
       <small>Deleted: ${formatDateTime(order.deleted_at)}</small>
       <small>Address: ${escapeHtml(deliveryAddress(order))}</small>
       <small>Items: ${order.items.map((item) => `${escapeHtml(item.name)} x ${Number(item.quantity || 1)}`).join(", ")}</small>

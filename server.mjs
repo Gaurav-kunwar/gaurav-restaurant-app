@@ -75,6 +75,7 @@ function ensureColumn(table, column, definition) {
   ["tax", "INTEGER"],
   ["final_total", "INTEGER"],
   ["placed_at", "TEXT"],
+  ["status_updated_at", "TEXT"],
   ["deleted_at", "TEXT"]
 ].forEach(([column, definition]) => ensureColumn("orders", column, definition));
 
@@ -320,9 +321,13 @@ async function handleApi(req, res, url) {
 
     if (req.method === "GET" && url.pathname === "/api/order-status") {
       const orderId = validateText(url.searchParams.get("orderId"), "Order ID", 6);
-      const order = db.prepare("SELECT order_id, status, placed_at FROM orders WHERE order_id = ? AND deleted_at IS NULL").get(orderId);
+      const order = db.prepare(`
+        SELECT order_id, status, placed_at, COALESCE(status_updated_at, placed_at, created_at) AS status_updated_at
+        FROM orders
+        WHERE order_id = ? AND deleted_at IS NULL
+      `).get(orderId);
       if (!order) throw new Error("Order not found");
-      return sendJson(res, 200, { order });
+      return sendJson(res, 200, { order, statuses: orderStatuses });
     }
 
     if (req.method === "PATCH" && url.pathname.endsWith("/restore") && url.pathname.startsWith("/api/orders/")) {
@@ -349,9 +354,10 @@ async function handleApi(req, res, url) {
       if (!Number.isInteger(id)) throw new Error("Invalid order");
       const body = await readJson(req);
       const status = validateOrderStatus(body.status);
-      const result = db.prepare("UPDATE orders SET status = ? WHERE id = ? AND deleted_at IS NULL").run(status, id);
+      const updatedAt = new Date().toISOString();
+      const result = db.prepare("UPDATE orders SET status = ?, status_updated_at = ? WHERE id = ? AND deleted_at IS NULL").run(status, updatedAt, id);
       if (result.changes === 0) throw new Error("Order not found");
-      return sendJson(res, 200, { ok: true, status });
+      return sendJson(res, 200, { ok: true, status, statusUpdatedAt: updatedAt });
     }
 
     if (req.method === "DELETE" && url.pathname.startsWith("/api/orders/")) {
@@ -401,9 +407,9 @@ async function handleApi(req, res, url) {
       db.prepare(`
         INSERT INTO orders (
           order_id, customer_name, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
-          final_total, house_flat, street_area, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at, status
+          final_total, house_flat, street_area, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at, status_updated_at, status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         customerName,
@@ -424,6 +430,7 @@ async function handleApi(req, res, url) {
         pinCode,
         deliveryInstructions,
         placedAt,
+        placedAt,
         "Pending"
       );
       return sendJson(res, 201, {
@@ -435,6 +442,7 @@ async function handleApi(req, res, url) {
         deliveryCharge,
         tax,
         status: "Pending",
+        statusUpdatedAt: placedAt,
         total: finalTotal
       });
     }

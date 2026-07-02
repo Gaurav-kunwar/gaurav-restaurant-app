@@ -182,6 +182,7 @@ checkoutForm.addEventListener("submit", async (event) => {
       deliveryCharge: result.deliveryCharge,
       tax: result.tax,
       status: result.status,
+      statusUpdatedAt: result.statusUpdatedAt,
       total: result.total
     }));
     state.cart = [];
