@@ -36,7 +36,7 @@
           <p class="eyebrow">Customer Details</p>
           <h2>Delivery information</h2>
 
-          <label>Customer Name
+          <label>Full Name
             <input name="customer_name" autocomplete="name" required>
             <span class="field-error" data-error-for="customer_name"></span>
           </label>
@@ -66,6 +66,13 @@
               <input name="city" autocomplete="address-level2" required>
               <span class="field-error" data-error-for="city"></span>
             </label>
+            <label>State
+              <input name="state" autocomplete="address-level1" required>
+              <span class="field-error" data-error-for="state"></span>
+            </label>
+          </div>
+
+          <div class="field-row">
             <label>Pincode
               <input name="pin_code" autocomplete="postal-code" inputmode="numeric" maxlength="6" required>
               <span class="field-error" data-error-for="pin_code"></span>

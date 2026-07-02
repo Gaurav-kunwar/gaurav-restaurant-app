@@ -38,9 +38,17 @@ function formatDateTime(value) {
 }
 
 function deliveryAddress(order) {
-  return order.full_address || [order.house_flat, order.street_area, order.landmark, order.city, order.pin_code]
+  return order.full_address || [order.house_flat, order.street_area, order.landmark, order.city, order.state, order.pin_code]
     .filter(Boolean)
     .join(", ") || "Delivery address not captured";
+}
+
+function phoneHref(phone) {
+  const text = String(phone || "").trim();
+  const normalized = text.startsWith("+")
+    ? `+${text.slice(1).replace(/\D/g, "")}`
+    : text.replace(/\D/g, "");
+  return normalized ? `tel:${normalized}` : "#";
 }
 
 function renderOrder(order) {
@@ -48,7 +56,7 @@ function renderOrder(order) {
     <div class="admin-item">
       <strong><span>${escapeHtml(order.customer_name)}</span><span>${rupees(order.final_total || order.total)}</span></strong>
       <small>Order ID: ${escapeHtml(order.order_id || order.id)}</small>
-      <small>Customer: ${escapeHtml(order.customer_name)} | Phone: ${escapeHtml(order.phone)}</small>
+      <small>Customer: ${escapeHtml(order.customer_name)} | Phone: <a class="admin-link" href="${phoneHref(order.phone)}">${escapeHtml(order.phone)}</a></small>
       <small>Status: ${escapeHtml(order.status)} | Date: ${formatDateTime(order.placed_at || order.created_at)}</small>
       <small>Deleted: ${formatDateTime(order.deleted_at)}</small>
       <small>Address: ${escapeHtml(deliveryAddress(order))}</small>

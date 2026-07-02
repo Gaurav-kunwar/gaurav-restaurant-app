@@ -105,11 +105,12 @@ function validateCheckout() {
   const data = Object.fromEntries(new FormData(checkoutForm));
   const errors = {};
   const required = {
-    customer_name: "Customer Name is required",
+    customer_name: "Full Name is required",
     phone: "Phone Number is required",
     house_flat: "House/Flat No. is required",
     street_area: "Street/Area is required",
     city: "City is required",
+    state: "State is required",
     pin_code: "Pincode is required"
   };
 
@@ -126,7 +127,7 @@ function validateCheckout() {
     errors.pin_code = "Enter a valid 6-digit pincode";
   }
 
-  ["customer_name", "phone", "house_flat", "street_area", "landmark", "city", "pin_code", "delivery_instructions"].forEach((name) => {
+  ["customer_name", "phone", "house_flat", "street_area", "landmark", "city", "state", "pin_code", "delivery_instructions"].forEach((name) => {
     setFieldError(name, errors[name] || "");
   });
 

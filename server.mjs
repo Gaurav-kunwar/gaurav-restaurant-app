@@ -372,10 +372,11 @@ async function handleApi(req, res, url) {
       const houseFlat = validateText(body.house_flat, "House/Flat No.", 1);
       const streetArea = validateText(body.street_area, "Street/Area", 3);
       const city = validateText(body.city, "City", 2);
+      const state = validateText(body.state, "State", 2);
       const pinCode = validatePinCode(body.pin_code);
       const landmark = String(body.landmark || "").trim();
       const deliveryInstructions = String(body.delivery_instructions || "").trim();
-      const fullAddress = [houseFlat, streetArea, landmark, city, pinCode].filter(Boolean).join(", ");
+      const fullAddress = [houseFlat, streetArea, landmark, city, state, pinCode].filter(Boolean).join(", ");
       const orderId = generateOrderId();
       const placedAt = new Date().toISOString();
       const menu = new Map(menuRows().map((item) => [item.id, item]));
@@ -400,9 +401,9 @@ async function handleApi(req, res, url) {
       db.prepare(`
         INSERT INTO orders (
           order_id, customer_name, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
-          final_total, house_flat, street_area, full_address, landmark, city, pin_code, delivery_instructions, placed_at, status
+          final_total, house_flat, street_area, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at, status
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).run(
         orderId,
         customerName,
@@ -419,6 +420,7 @@ async function handleApi(req, res, url) {
         fullAddress,
         landmark,
         city,
+        state,
         pinCode,
         deliveryInstructions,
         placedAt,
