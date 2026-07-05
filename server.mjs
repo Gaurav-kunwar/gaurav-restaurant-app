@@ -2,14 +2,15 @@ import { createServer } from "node:http";
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { existsSync, mkdirSync } from "node:fs";
-import { extname, join, normalize } from "node:path";
+import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
-const dataDir = join(__dirname, "data");
-const dbPath = join(dataDir, "gaurav-restaurant.sqlite");
+const defaultDataDir = join(__dirname, "data");
+const dbPath = process.env.DB_PATH || join(defaultDataDir, "gaurav-restaurant.sqlite");
+const dataDir = dirname(dbPath);
 const port = Number(process.env.PORT || 4180);
 const adminEmail = process.env.ADMIN_EMAIL || "owner@gauravrestaurant.local";
 const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
@@ -215,8 +216,17 @@ function validateOrderStatus(value) {
 function orderRows(where = "deleted_at IS NULL") {
   return db.prepare(`SELECT * FROM orders WHERE ${where} ORDER BY COALESCE(placed_at, created_at) DESC`).all().map((order) => ({
     ...order,
-    items: JSON.parse(order.items_json)
+    items: parseOrderItems(order.items_json)
   }));
+}
+
+function parseOrderItems(value) {
+  try {
+    const items = JSON.parse(value || "[]");
+    return Array.isArray(items) ? items : [];
+  } catch {
+    return [];
+  }
 }
 
 function orderDate(order) {

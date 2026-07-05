@@ -1,0 +1,136 @@
+import assert from "node:assert/strict";
+import { spawn } from "node:child_process";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const port = 5400 + Math.floor(Math.random() * 1000);
+const baseUrl = `http://127.0.0.1:${port}`;
+const tmp = await mkdtemp(join(tmpdir(), "gr-dashboard-"));
+const dbPath = join(tmp, "test.sqlite");
+let server;
+
+async function request(path, options = {}) {
+  const response = await fetch(`${baseUrl}${path}`, {
+    headers: { "content-type": "application/json", ...(options.headers || {}) },
+    ...options
+  });
+  const text = await response.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!response.ok) {
+    throw new Error(data.error || `Request failed: ${response.status}`);
+  }
+  return { data, response };
+}
+
+async function waitForServer() {
+  const deadline = Date.now() + 10_000;
+  while (Date.now() < deadline) {
+    try {
+      await request("/api/menu");
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+  }
+  throw new Error("Server did not start in time");
+}
+
+async function createOrder(itemId, quantity, name) {
+  const { data } = await request("/api/orders", {
+    method: "POST",
+    body: JSON.stringify({
+      customer_name: name,
+      phone: "9876543210",
+      order_type: "delivery",
+      house_flat: "12A",
+      street_area: "MG Road",
+      city: "Bengaluru",
+      state: "Karnataka",
+      pin_code: "560001",
+      items: [{ id: itemId, quantity }]
+    })
+  });
+  return data;
+}
+
+try {
+  server = spawn(process.execPath, ["server.mjs"], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      PORT: String(port),
+      DB_PATH: dbPath
+    },
+    stdio: ["ignore", "pipe", "pipe"]
+  });
+
+  let stderr = "";
+  server.stderr.on("data", (chunk) => {
+    stderr += chunk;
+  });
+
+  await waitForServer();
+
+  const login = await request("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({
+      email: "owner@gauravrestaurant.local",
+      password: "admin123"
+    })
+  });
+  const cookie = login.response.headers.get("set-cookie")?.split(";")[0];
+  assert.ok(cookie, "admin login should return a session cookie");
+  const adminHeaders = { cookie };
+
+  const { data: menu } = await request("/api/menu");
+  const paneer = menu.items.find((item) => item.name === "Paneer Tikka");
+  const chickenBiryani = menu.items.find((item) => item.name === "Chicken Biryani");
+  const butterChicken = menu.items.find((item) => item.name === "Butter Chicken");
+  assert.ok(paneer && chickenBiryani && butterChicken, "seed menu items should exist");
+
+  const delivered = await createOrder(paneer.id, 2, "Delivered Customer");
+  const cancelled = await createOrder(butterChicken.id, 1, "Cancelled Customer");
+  const pending = await createOrder(chickenBiryani.id, 3, "Pending Customer");
+
+  const { data: ordersData } = await request("/api/orders", { headers: adminHeaders });
+  const ordersByPublicId = new Map(ordersData.orders.map((order) => [order.order_id, order]));
+
+  await request(`/api/orders/${ordersByPublicId.get(delivered.orderId).id}`, {
+    method: "PATCH",
+    headers: adminHeaders,
+    body: JSON.stringify({ status: "Delivered" })
+  });
+  await request(`/api/orders/${ordersByPublicId.get(cancelled.orderId).id}`, {
+    method: "PATCH",
+    headers: adminHeaders,
+    body: JSON.stringify({ status: "Cancelled" })
+  });
+
+  const { data: dashboard } = await request("/api/admin/dashboard?filter=today", { headers: adminHeaders });
+
+  assert.equal(dashboard.summary.totalOrders, 3);
+  assert.equal(dashboard.summary.todaysOrders, 3);
+  assert.equal(dashboard.summary.pendingOrders, 1);
+  assert.equal(dashboard.summary.deliveredOrders, 1);
+  assert.equal(dashboard.summary.cancelledOrders, 1);
+  assert.equal(dashboard.summary.totalRevenue, delivered.total);
+  assert.equal(dashboard.summary.todayRevenue, delivered.total);
+  assert.equal(dashboard.recentOrders.length, 3);
+  assert.ok(dashboard.recentOrders.some((order) => order.order_id === pending.orderId));
+  assert.equal(dashboard.topItems[0].name, "Chicken Biryani");
+  assert.equal(dashboard.topItems[0].quantity, 3);
+  assert.ok(dashboard.charts.some((point) => point.orders === 3 && point.revenue === delivered.total));
+
+  for (const filter of ["week", "month", "all"]) {
+    const { data } = await request(`/api/admin/dashboard?filter=${filter}`, { headers: adminHeaders });
+    assert.equal(data.filter, filter);
+    assert.equal(data.summary.totalOrders, 3);
+  }
+
+  console.log("Dashboard analytics smoke test passed");
+} finally {
+  if (server && !server.killed) server.kill();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  await rm(tmp, { recursive: true, force: true });
+}
