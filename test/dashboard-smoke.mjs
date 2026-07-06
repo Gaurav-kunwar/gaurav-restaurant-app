@@ -160,6 +160,7 @@ try {
   const pending = await createOrder(chickenBiryani.id, 3, "Pending Customer");
 
   const { data: ordersData } = await request("/api/orders", { headers: adminHeaders });
+  assert.equal(ordersData.orders.length, 3);
   const ordersByPublicId = new Map(ordersData.orders.map((order) => [order.order_id, order]));
 
   await request(`/api/orders/${ordersByPublicId.get(delivered.orderId).id}`, {

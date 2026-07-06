@@ -253,18 +253,20 @@ dashboardFilters.addEventListener("click", async (event) => {
   }
 });
 
-emailTestButton.addEventListener("click", async () => {
-  emailTestButton.disabled = true;
-  emailTestStatus.textContent = "Sending test email...";
-  try {
-    const result = await api("/api/admin/email-test", { method: "POST" });
-    emailTestStatus.textContent = result.message || "Test email sent.";
-  } catch (error) {
-    emailTestStatus.textContent = error.message;
-  } finally {
-    emailTestButton.disabled = false;
-  }
-});
+if (emailTestButton && emailTestStatus) {
+  emailTestButton.addEventListener("click", async () => {
+    emailTestButton.disabled = true;
+    emailTestStatus.textContent = "Sending test email...";
+    try {
+      const result = await api("/api/admin/email-test", { method: "POST" });
+      emailTestStatus.textContent = result.message || "Test email sent.";
+    } catch (error) {
+      emailTestStatus.textContent = error.message;
+    } finally {
+      emailTestButton.disabled = false;
+    }
+  });
+}
 
 logoutButton.addEventListener("click", async () => {
   await api("/api/auth/logout", { method: "POST" });
