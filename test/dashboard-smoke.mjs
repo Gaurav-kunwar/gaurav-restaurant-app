@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { mkdtemp, rm } from "node:fs/promises";
+import { createServer as createNetServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -9,6 +10,8 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const tmp = await mkdtemp(join(tmpdir(), "gr-dashboard-"));
 const dbPath = join(tmp, "test.sqlite");
 let server;
+let smtpServer;
+const smtpMessages = [];
 
 async function request(path, options = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
@@ -55,7 +58,59 @@ async function createOrder(itemId, quantity, name) {
   return data;
 }
 
+function startSmtpServer() {
+  return new Promise((resolve, reject) => {
+    const listener = createNetServer((socket) => {
+      let dataMode = false;
+      let message = "";
+      socket.setEncoding("utf8");
+      socket.write("220 local test smtp\r\n");
+
+      socket.on("data", (chunk) => {
+        for (const line of chunk.split(/\r?\n/)) {
+          if (!line && !dataMode) continue;
+          if (dataMode) {
+            if (line === ".") {
+              smtpMessages.push(message);
+              message = "";
+              dataMode = false;
+              socket.write("250 queued\r\n");
+            } else {
+              message += `${line}\n`;
+            }
+            continue;
+          }
+
+          const command = line.toUpperCase();
+          if (command.startsWith("EHLO") || command.startsWith("HELO")) {
+            socket.write("250-localhost\r\n250 AUTH PLAIN LOGIN\r\n");
+          } else if (command.startsWith("AUTH")) {
+            socket.write("235 authenticated\r\n");
+          } else if (command.startsWith("MAIL FROM") || command.startsWith("RCPT TO")) {
+            socket.write("250 ok\r\n");
+          } else if (command.startsWith("DATA")) {
+            dataMode = true;
+            socket.write("354 end with dot\r\n");
+          } else if (command.startsWith("RSET")) {
+            socket.write("250 reset\r\n");
+          } else if (command.startsWith("QUIT")) {
+            socket.write("221 bye\r\n");
+            socket.end();
+          } else {
+            socket.write("250 ok\r\n");
+          }
+        }
+      });
+    });
+    listener.once("error", reject);
+    listener.listen(0, "127.0.0.1", () => resolve(listener));
+  });
+}
+
 try {
+  smtpServer = await startSmtpServer();
+  const smtpPort = smtpServer.address().port;
+
   server = spawn(process.execPath, ["server.mjs"], {
     cwd: process.cwd(),
     env: {
@@ -63,7 +118,10 @@ try {
       PORT: String(port),
       DB_PATH: dbPath,
       ADMIN_EMAIL: "owner@example.com",
-      EMAIL_TRANSPORT: "json",
+      SMTP_HOST: " 127.0.0.1 ",
+      SMTP_PORT: ` ${smtpPort} `,
+      SMTP_USER: " sender@example.com ",
+      SMTP_PASS: " test-password ",
       EMAIL_AWAIT_SEND: "true"
     },
     stdio: ["ignore", "pipe", "pipe"]
@@ -143,10 +201,15 @@ try {
   assert.match(stdout, /\[email\] admin order notification sent/);
   assert.match(stdout, /\[email\] customer order confirmation sent/);
   assert.match(stdout, /\[email\] admin test email sent/);
+  assert.equal(smtpMessages.length, 7);
+  assert.ok(smtpMessages.some((message) => message.includes("Gaurav Restaurant test email")));
+  assert.ok(smtpMessages.some((message) => message.includes("New order received at Gaurav Restaurant")));
+  assert.ok(smtpMessages.some((message) => message.includes("Thank you for your order")));
 
   console.log("Dashboard analytics and email smoke test passed");
 } finally {
   if (server && !server.killed) server.kill();
+  if (smtpServer) smtpServer.close();
   await new Promise((resolve) => setTimeout(resolve, 100));
   await rm(tmp, { recursive: true, force: true });
 }

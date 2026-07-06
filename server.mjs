@@ -15,10 +15,6 @@ const dataDir = dirname(dbPath);
 const port = Number(process.env.PORT || 4180);
 const adminEmail = process.env.ADMIN_EMAIL || "owner@gauravrestaurant.local";
 const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
-const smtpHost = process.env.SMTP_HOST || "";
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpUser = process.env.SMTP_USER || "";
-const smtpPass = process.env.SMTP_PASS || "";
 const restaurantName = "Gaurav Restaurant";
 const sessions = new Map();
 
@@ -381,33 +377,59 @@ function itemListHtml(items) {
   `).join("")}</ul>`;
 }
 
+function envText(name) {
+  return String(process.env[name] || "").trim();
+}
+
+function readEmailConfig() {
+  const portValue = envText("SMTP_PORT") || "587";
+  const smtpPort = Number(portValue);
+  return {
+    adminEmail: envText("ADMIN_EMAIL") || adminEmail,
+    smtpHost: envText("SMTP_HOST"),
+    smtpPort,
+    smtpUser: envText("SMTP_USER"),
+    smtpPass: envText("SMTP_PASS"),
+    transport: envText("EMAIL_TRANSPORT"),
+    missing: [
+      ["SMTP_HOST", envText("SMTP_HOST")],
+      ["SMTP_PORT", Number.isInteger(smtpPort) && smtpPort > 0 ? portValue : ""],
+      ["SMTP_USER", envText("SMTP_USER")],
+      ["SMTP_PASS", envText("SMTP_PASS")]
+    ].filter(([, value]) => !value).map(([name]) => name)
+  };
+}
+
 function emailTransportReady() {
-  return process.env.EMAIL_TRANSPORT === "json" || Boolean(smtpHost && smtpPort && smtpUser && smtpPass);
+  const config = readEmailConfig();
+  return config.transport === "json" || config.missing.length === 0;
 }
 
 function createEmailTransport() {
-  if (process.env.EMAIL_TRANSPORT === "json") {
+  const config = readEmailConfig();
+  if (config.transport === "json") {
     return nodemailer.createTransport({ jsonTransport: true });
   }
-  if (!emailTransportReady()) {
-    throw new Error("SMTP email configuration is incomplete");
+  if (config.missing.length > 0) {
+    throw new Error(`SMTP email configuration is incomplete. Missing or invalid: ${config.missing.join(", ")}`);
   }
   return nodemailer.createTransport({
-    host: smtpHost,
-    port: smtpPort,
-    secure: smtpPort === 465,
+    host: config.smtpHost,
+    port: config.smtpPort,
+    secure: config.smtpPort === 465,
     auth: {
-      user: smtpUser,
-      pass: smtpPass
+      user: config.smtpUser,
+      pass: config.smtpPass
     }
   });
 }
 
 async function sendEmail(label, message) {
   try {
+    const config = readEmailConfig();
     const transporter = createEmailTransport();
     const info = await transporter.sendMail({
-      from: `"${restaurantName}" <${smtpUser || adminEmail}>`,
+      from: `"${restaurantName}" <${config.smtpUser || config.adminEmail}>`,
       ...message
     });
     console.log(`[email] ${label} sent`, info.messageId || info.response || "ok");
@@ -419,10 +441,11 @@ async function sendEmail(label, message) {
 }
 
 function buildAdminOrderEmail(order) {
+  const config = readEmailConfig();
   const itemsText = itemLines(order.items).join("\n");
   const instructions = order.delivery_instructions || "None";
   return {
-    to: adminEmail,
+    to: config.adminEmail,
     subject: `New order ${order.order_id} - ${restaurantName}`,
     text: [
       `New order received at ${restaurantName}`,
@@ -586,8 +609,9 @@ async function handleApi(req, res, url) {
 
     if (req.method === "POST" && url.pathname === "/api/admin/email-test") {
       if (!requireAdmin(req, res)) return;
+      const config = readEmailConfig();
       const result = await sendEmail("admin test email", {
-        to: adminEmail,
+        to: config.adminEmail,
         subject: `${restaurantName} test email`,
         text: [
           `This is a test email from ${restaurantName}.`,
@@ -600,7 +624,7 @@ async function handleApi(req, res, url) {
           <p><strong>Sent at:</strong> ${escapeHtml(formatEmailDate(new Date().toISOString()))}</p>
         `
       });
-      return sendJson(res, result.ok ? 200 : 400, result.ok ? { ok: true, message: `Test email sent to ${adminEmail}` } : { ok: false, error: result.error });
+      return sendJson(res, result.ok ? 200 : 400, result.ok ? { ok: true, message: `Test email sent to ${config.adminEmail}` } : { ok: false, error: result.error });
     }
 
     if (req.method === "POST" && url.pathname === "/api/reservations") {
