@@ -5,6 +5,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { DatabaseSync } from "node:sqlite";
+import nodemailer from "nodemailer";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const publicDir = join(__dirname, "public");
@@ -14,6 +15,11 @@ const dataDir = dirname(dbPath);
 const port = Number(process.env.PORT || 4180);
 const adminEmail = process.env.ADMIN_EMAIL || "owner@gauravrestaurant.local";
 const adminPassword = process.env.ADMIN_PASSWORD || "admin123";
+const smtpHost = process.env.SMTP_HOST || "";
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpUser = process.env.SMTP_USER || "";
+const smtpPass = process.env.SMTP_PASS || "";
+const restaurantName = "Gaurav Restaurant";
 const sessions = new Map();
 
 if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true });
@@ -63,6 +69,7 @@ function ensureColumn(table, column, definition) {
 
 [
   ["order_id", "TEXT"],
+  ["customer_email", "TEXT"],
   ["house_flat", "TEXT"],
   ["street_area", "TEXT"],
   ["full_address", "TEXT"],
@@ -194,6 +201,12 @@ function validatePhone(value) {
   const digits = phone.replace(/\D/g, "");
   if (digits.length < 10 || digits.length > 15) throw new Error("Enter a valid phone number");
   return phone;
+}
+
+function validateEmail(value, label = "Email") {
+  const email = validateText(value, label, 5).toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`Enter a valid ${label.toLowerCase()}`);
+  return email;
 }
 
 function validatePinCode(value) {
@@ -333,6 +346,167 @@ function buildDashboard(filter) {
   };
 }
 
+function rupees(value) {
+  return `INR ${Number(value || 0).toLocaleString("en-IN")}`;
+}
+
+function formatEmailDate(value) {
+  return new Intl.DateTimeFormat("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(new Date(value));
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&#39;"
+  }[char]));
+}
+
+function orderTypeLabel(order) {
+  return order.order_type === "pickup" ? "Pickup" : "Delivery";
+}
+
+function itemLines(items) {
+  return items.map((item) => `${item.name} x ${Number(item.quantity || 1)} - ${rupees(item.line_total || item.price * Number(item.quantity || 1))}`);
+}
+
+function itemListHtml(items) {
+  return `<ul>${items.map((item) => `
+    <li>${escapeHtml(item.name)} x ${Number(item.quantity || 1)} - ${escapeHtml(rupees(item.line_total || item.price * Number(item.quantity || 1)))}</li>
+  `).join("")}</ul>`;
+}
+
+function emailTransportReady() {
+  return process.env.EMAIL_TRANSPORT === "json" || Boolean(smtpHost && smtpPort && smtpUser && smtpPass);
+}
+
+function createEmailTransport() {
+  if (process.env.EMAIL_TRANSPORT === "json") {
+    return nodemailer.createTransport({ jsonTransport: true });
+  }
+  if (!emailTransportReady()) {
+    throw new Error("SMTP email configuration is incomplete");
+  }
+  return nodemailer.createTransport({
+    host: smtpHost,
+    port: smtpPort,
+    secure: smtpPort === 465,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass
+    }
+  });
+}
+
+async function sendEmail(label, message) {
+  try {
+    const transporter = createEmailTransport();
+    const info = await transporter.sendMail({
+      from: `"${restaurantName}" <${smtpUser || adminEmail}>`,
+      ...message
+    });
+    console.log(`[email] ${label} sent`, info.messageId || info.response || "ok");
+    return { ok: true, messageId: info.messageId || null };
+  } catch (error) {
+    console.error(`[email] ${label} failed: ${error.message}`);
+    return { ok: false, error: error.message };
+  }
+}
+
+function buildAdminOrderEmail(order) {
+  const itemsText = itemLines(order.items).join("\n");
+  const instructions = order.delivery_instructions || "None";
+  return {
+    to: adminEmail,
+    subject: `New order ${order.order_id} - ${restaurantName}`,
+    text: [
+      `New order received at ${restaurantName}`,
+      "",
+      `Order ID: ${order.order_id}`,
+      `Customer Name: ${order.customer_name}`,
+      `Phone Number: ${order.phone}`,
+      `Email: ${order.customer_email}`,
+      `Full Address: ${order.full_address || "Pickup order"}`,
+      `Order Type: ${orderTypeLabel(order)}`,
+      `Special Instructions: ${instructions}`,
+      `Date & Time: ${formatEmailDate(order.placed_at || order.created_at)}`,
+      "",
+      "Ordered Items:",
+      itemsText,
+      "",
+      `Total Amount: ${rupees(orderAmount(order))}`
+    ].join("\n"),
+    html: `
+      <h2>New order received at ${escapeHtml(restaurantName)}</h2>
+      <p><strong>Order ID:</strong> ${escapeHtml(order.order_id)}</p>
+      <p><strong>Customer Name:</strong> ${escapeHtml(order.customer_name)}</p>
+      <p><strong>Phone Number:</strong> ${escapeHtml(order.phone)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(order.customer_email)}</p>
+      <p><strong>Full Address:</strong> ${escapeHtml(order.full_address || "Pickup order")}</p>
+      <p><strong>Order Type:</strong> ${escapeHtml(orderTypeLabel(order))}</p>
+      <p><strong>Special Instructions:</strong> ${escapeHtml(instructions)}</p>
+      <p><strong>Date & Time:</strong> ${escapeHtml(formatEmailDate(order.placed_at || order.created_at))}</p>
+      <h3>Ordered Items</h3>
+      ${itemListHtml(order.items)}
+      <p><strong>Total Amount:</strong> ${escapeHtml(rupees(orderAmount(order)))}</p>
+    `
+  };
+}
+
+function buildCustomerOrderEmail(order) {
+  const estimate = order.order_type === "pickup" ? "25-30 minutes" : "45-60 minutes";
+  return {
+    to: order.customer_email,
+    subject: `Your ${restaurantName} order ${order.order_id} is confirmed`,
+    text: [
+      restaurantName,
+      "",
+      `Thank you for your order, ${order.customer_name}.`,
+      `Order ID: ${order.order_id}`,
+      "",
+      "Ordered Items:",
+      itemLines(order.items).join("\n"),
+      "",
+      `Total: ${rupees(orderAmount(order))}`,
+      `Order Status: ${order.status}`,
+      `Estimated ${order.order_type === "pickup" ? "Pickup" : "Delivery"} Time: ${estimate}`,
+      "",
+      `Thank you for choosing ${restaurantName}.`
+    ].join("\n"),
+    html: `
+      <h2>${escapeHtml(restaurantName)}</h2>
+      <p>Thank you for your order, ${escapeHtml(order.customer_name)}.</p>
+      <p><strong>Order ID:</strong> ${escapeHtml(order.order_id)}</p>
+      <h3>Ordered Items</h3>
+      ${itemListHtml(order.items)}
+      <p><strong>Total:</strong> ${escapeHtml(rupees(orderAmount(order)))}</p>
+      <p><strong>Order Status:</strong> ${escapeHtml(order.status)}</p>
+      <p><strong>Estimated ${escapeHtml(order.order_type === "pickup" ? "Pickup" : "Delivery")} Time:</strong> ${escapeHtml(estimate)}</p>
+      <p>Thank you for choosing ${escapeHtml(restaurantName)}.</p>
+    `
+  };
+}
+
+async function sendOrderEmails(order) {
+  const results = await Promise.all([
+    sendEmail("admin order notification", buildAdminOrderEmail(order)),
+    sendEmail("customer order confirmation", buildCustomerOrderEmail(order))
+  ]);
+  return { admin: results[0], customer: results[1] };
+}
+
+function queueOrderEmails(order) {
+  const sendTask = sendOrderEmails(order);
+  if (process.env.EMAIL_AWAIT_SEND === "true") return sendTask;
+  sendTask.catch((error) => console.error(`[email] order email task failed: ${error.message}`));
+  return Promise.resolve(null);
+}
+
 async function handleApi(req, res, url) {
   try {
     if (req.method === "GET" && url.pathname === "/api/auth/me") {
@@ -408,6 +582,25 @@ async function handleApi(req, res, url) {
     if (req.method === "GET" && url.pathname === "/api/admin/dashboard") {
       if (!requireAdmin(req, res)) return;
       return sendJson(res, 200, buildDashboard(url.searchParams.get("filter")));
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/admin/email-test") {
+      if (!requireAdmin(req, res)) return;
+      const result = await sendEmail("admin test email", {
+        to: adminEmail,
+        subject: `${restaurantName} test email`,
+        text: [
+          `This is a test email from ${restaurantName}.`,
+          "",
+          `Sent at: ${formatEmailDate(new Date().toISOString())}`
+        ].join("\n"),
+        html: `
+          <h2>${escapeHtml(restaurantName)} test email</h2>
+          <p>This is a test email from ${escapeHtml(restaurantName)}.</p>
+          <p><strong>Sent at:</strong> ${escapeHtml(formatEmailDate(new Date().toISOString()))}</p>
+        `
+      });
+      return sendJson(res, result.ok ? 200 : 400, result.ok ? { ok: true, message: `Test email sent to ${adminEmail}` } : { ok: false, error: result.error });
     }
 
     if (req.method === "POST" && url.pathname === "/api/reservations") {
@@ -493,6 +686,7 @@ async function handleApi(req, res, url) {
       const items = Array.isArray(body.items) ? body.items : [];
       if (items.length === 0) throw new Error("Cart is empty");
       const customerName = validateText(body.customer_name || body.full_name, "Customer Name", 2);
+      const customerEmail = validateEmail(body.customer_email || body.email, "Customer Email");
       const phone = validatePhone(body.phone);
       const houseFlat = validateText(body.house_flat, "House/Flat No.", 1);
       const streetArea = validateText(body.street_area, "Street/Area", 3);
@@ -523,46 +717,72 @@ async function handleApi(req, res, url) {
       const subtotal = safeItems.reduce((sum, item) => sum + item.line_total, 0);
       const tax = Math.round(subtotal * taxRate);
       const finalTotal = subtotal + deliveryCharge + tax;
-      db.prepare(`
-        INSERT INTO orders (
-          order_id, customer_name, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
-          final_total, house_flat, street_area, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at, status_updated_at, status
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `).run(
-        orderId,
-        customerName,
+      const savedOrder = {
+        order_id: orderId,
+        customer_name: customerName,
+        customer_email: customerEmail,
         phone,
-        body.order_type === "delivery" ? "delivery" : "pickup",
-        JSON.stringify(safeItems),
+        order_type: body.order_type === "delivery" ? "delivery" : "pickup",
+        items: safeItems,
         subtotal,
-        deliveryCharge,
+        delivery_charge: deliveryCharge,
         tax,
-        finalTotal,
-        finalTotal,
-        houseFlat,
-        streetArea,
-        fullAddress,
+        total: finalTotal,
+        final_total: finalTotal,
+        house_flat: houseFlat,
+        street_area: streetArea,
+        full_address: fullAddress,
         landmark,
         city,
         state,
-        pinCode,
-        deliveryInstructions,
-        placedAt,
-        placedAt,
-        "Pending"
+        pin_code: pinCode,
+        delivery_instructions: deliveryInstructions,
+        placed_at: placedAt,
+        status_updated_at: placedAt,
+        status: "Pending"
+      };
+      db.prepare(`
+        INSERT INTO orders (
+          order_id, customer_name, customer_email, phone, order_type, items_json, subtotal, delivery_charge, tax, total,
+          final_total, house_flat, street_area, full_address, landmark, city, state, pin_code, delivery_instructions, placed_at, status_updated_at, status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        savedOrder.order_id,
+        savedOrder.customer_name,
+        savedOrder.customer_email,
+        savedOrder.phone,
+        savedOrder.order_type,
+        JSON.stringify(savedOrder.items),
+        savedOrder.subtotal,
+        savedOrder.delivery_charge,
+        savedOrder.tax,
+        savedOrder.total,
+        savedOrder.final_total,
+        savedOrder.house_flat,
+        savedOrder.street_area,
+        savedOrder.full_address,
+        savedOrder.landmark,
+        savedOrder.city,
+        savedOrder.state,
+        savedOrder.pin_code,
+        savedOrder.delivery_instructions,
+        savedOrder.placed_at,
+        savedOrder.status_updated_at,
+        savedOrder.status
       );
+      await queueOrderEmails(savedOrder);
       return sendJson(res, 201, {
         ok: true,
         message: "Order saved",
-        orderId,
-        placedAt,
-        subtotal,
-        deliveryCharge,
-        tax,
-        status: "Pending",
-        statusUpdatedAt: placedAt,
-        total: finalTotal
+        orderId: savedOrder.order_id,
+        placedAt: savedOrder.placed_at,
+        subtotal: savedOrder.subtotal,
+        deliveryCharge: savedOrder.delivery_charge,
+        tax: savedOrder.tax,
+        status: savedOrder.status,
+        statusUpdatedAt: savedOrder.status_updated_at,
+        total: savedOrder.final_total
       });
     }
 

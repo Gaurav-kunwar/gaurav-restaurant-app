@@ -25,7 +25,7 @@ async function api(path, options = {}) {
 }
 
 function rupees(value) {
-  return `₹${Number(value).toLocaleString("en-IN")}`;
+  return `Rs. ${Number(value).toLocaleString("en-IN")}`;
 }
 
 function loadCart() {
@@ -107,6 +107,7 @@ function validateCheckout() {
   const required = {
     customer_name: "Full Name is required",
     phone: "Phone Number is required",
+    customer_email: "Email Address is required",
     house_flat: "House/Flat No. is required",
     street_area: "Street/Area is required",
     city: "City is required",
@@ -123,11 +124,15 @@ function validateCheckout() {
     errors.phone = "Enter a valid phone number";
   }
 
+  if (data.customer_email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.customer_email).trim())) {
+    errors.customer_email = "Enter a valid email address";
+  }
+
   if (data.pin_code && !/^\d{6}$/.test(String(data.pin_code).trim())) {
     errors.pin_code = "Enter a valid 6-digit pincode";
   }
 
-  ["customer_name", "phone", "house_flat", "street_area", "landmark", "city", "state", "pin_code", "delivery_instructions"].forEach((name) => {
+  ["customer_name", "phone", "customer_email", "house_flat", "street_area", "landmark", "city", "state", "pin_code", "delivery_instructions"].forEach((name) => {
     setFieldError(name, errors[name] || "");
   });
 
@@ -139,6 +144,7 @@ function hydrateForm() {
     const saved = JSON.parse(sessionStorage.getItem(CHECKOUT_DETAILS_KEY) || "{}");
     if (saved.customer_name) checkoutForm.elements.customer_name.value = saved.customer_name;
     if (saved.phone) checkoutForm.elements.phone.value = saved.phone;
+    if (saved.customer_email) checkoutForm.elements.customer_email.value = saved.customer_email;
     if (saved.order_type) checkoutForm.elements.order_type.value = saved.order_type;
   } catch {
     sessionStorage.removeItem(CHECKOUT_DETAILS_KEY);

@@ -14,6 +14,7 @@
         <a href="#menuAdmin">Menu</a>
         <a href="#bookingsAdmin">Bookings</a>
         <a href="#ordersAdmin">Orders</a>
+        <a href="#settingsAdmin">Settings</a>
         <a href="/trash.html">Trash</a>
         <button class="nav-button" id="logoutButton" type="button">Logout</button>
       </nav>
@@ -108,6 +109,16 @@
           <h2>Pickup and delivery</h2>
           <a class="admin-link" href="/trash.html">View Trash</a>
           <div class="admin-list" id="orderList"></div>
+        </div>
+      </section>
+
+      <section class="section admin-grid" id="settingsAdmin">
+        <div class="panel">
+          <p class="eyebrow">Admin Settings</p>
+          <h2>Email notifications</h2>
+          <p>Send a test email to confirm the current SMTP configuration.</p>
+          <button class="btn secondary" id="emailTestButton" type="button">Send Test Email</button>
+          <p class="status" id="emailTestStatus"></p>
         </div>
       </section>
     </main>

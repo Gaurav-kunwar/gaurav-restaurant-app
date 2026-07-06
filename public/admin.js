@@ -9,6 +9,8 @@ const dashboardRecentOrders = document.querySelector("#dashboardRecentOrders");
 const dashboardTopItems = document.querySelector("#dashboardTopItems");
 const ordersChart = document.querySelector("#ordersChart");
 const revenueChart = document.querySelector("#revenueChart");
+const emailTestButton = document.querySelector("#emailTestButton");
+const emailTestStatus = document.querySelector("#emailTestStatus");
 const orderStatuses = ["Pending", "Accepted", "Preparing", "Ready", "Out for Delivery", "Delivered", "Cancelled"];
 let dashboardFilter = "today";
 
@@ -41,7 +43,7 @@ function formatDateTime(value) {
 }
 
 function rupees(value) {
-  return `₹${Number(value).toLocaleString("en-IN")}`;
+  return `Rs. ${Number(value).toLocaleString("en-IN")}`;
 }
 
 function empty(text) {
@@ -179,7 +181,7 @@ async function loadAdmin() {
     <div class="admin-item">
       <strong><span>${escapeHtml(order.customer_name)}</span><span>${rupees(order.final_total || order.total)}</span></strong>
       <small>Order ID: ${escapeHtml(order.order_id || order.id)}</small>
-      <small>Customer: ${escapeHtml(order.customer_name)} | Phone: <a class="admin-link" href="${phoneHref(order.phone)}">${escapeHtml(order.phone)}</a></small>
+      <small>Customer: ${escapeHtml(order.customer_name)} | Email: ${escapeHtml(order.customer_email || "Not captured")} | Phone: <a class="admin-link" href="${phoneHref(order.phone)}">${escapeHtml(order.phone)}</a></small>
       <small>Type: ${escapeHtml(order.order_type)} | Status: ${escapeHtml(order.status)} | Date: ${formatDateTime(order.placed_at || order.created_at)}</small>
       <small>Status updated: ${formatDateTime(order.status_updated_at || order.placed_at || order.created_at)}</small>
       <label class="admin-status">Status
@@ -248,6 +250,19 @@ dashboardFilters.addEventListener("click", async (event) => {
     renderDashboard(dashboard);
   } catch (error) {
     dashboardCards.innerHTML = empty(error.message);
+  }
+});
+
+emailTestButton.addEventListener("click", async () => {
+  emailTestButton.disabled = true;
+  emailTestStatus.textContent = "Sending test email...";
+  try {
+    const result = await api("/api/admin/email-test", { method: "POST" });
+    emailTestStatus.textContent = result.message || "Test email sent.";
+  } catch (error) {
+    emailTestStatus.textContent = error.message;
+  } finally {
+    emailTestButton.disabled = false;
   }
 });
 

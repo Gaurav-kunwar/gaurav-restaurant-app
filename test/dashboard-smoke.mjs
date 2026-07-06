@@ -41,6 +41,7 @@ async function createOrder(itemId, quantity, name) {
     method: "POST",
     body: JSON.stringify({
       customer_name: name,
+      customer_email: `${name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
       phone: "9876543210",
       order_type: "delivery",
       house_flat: "12A",
@@ -60,12 +61,19 @@ try {
     env: {
       ...process.env,
       PORT: String(port),
-      DB_PATH: dbPath
+      DB_PATH: dbPath,
+      ADMIN_EMAIL: "owner@example.com",
+      EMAIL_TRANSPORT: "json",
+      EMAIL_AWAIT_SEND: "true"
     },
     stdio: ["ignore", "pipe", "pipe"]
   });
 
+  let stdout = "";
   let stderr = "";
+  server.stdout.on("data", (chunk) => {
+    stdout += chunk;
+  });
   server.stderr.on("data", (chunk) => {
     stderr += chunk;
   });
@@ -75,7 +83,7 @@ try {
   const login = await request("/api/auth/login", {
     method: "POST",
     body: JSON.stringify({
-      email: "owner@gauravrestaurant.local",
+      email: "owner@example.com",
       password: "admin123"
     })
   });
@@ -122,13 +130,21 @@ try {
   assert.equal(dashboard.topItems[0].quantity, 3);
   assert.ok(dashboard.charts.some((point) => point.orders === 3 && point.revenue === delivered.total));
 
+  const emailTest = await request("/api/admin/email-test", { method: "POST", headers: adminHeaders });
+  assert.equal(emailTest.data.ok, true);
+  assert.match(emailTest.data.message, /owner@example\.com/);
+
   for (const filter of ["week", "month", "all"]) {
     const { data } = await request(`/api/admin/dashboard?filter=${filter}`, { headers: adminHeaders });
     assert.equal(data.filter, filter);
     assert.equal(data.summary.totalOrders, 3);
   }
 
-  console.log("Dashboard analytics smoke test passed");
+  assert.match(stdout, /\[email\] admin order notification sent/);
+  assert.match(stdout, /\[email\] customer order confirmation sent/);
+  assert.match(stdout, /\[email\] admin test email sent/);
+
+  console.log("Dashboard analytics and email smoke test passed");
 } finally {
   if (server && !server.killed) server.kill();
   await new Promise((resolve) => setTimeout(resolve, 100));
